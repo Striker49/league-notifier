@@ -65,7 +65,8 @@ async function connectToLeague() {
         
         console.log("invitation payload: ", payload?.data);
 
-        const [summonerName, gameMode] = await getInviteInfo(payload.data[0].fromSummonerId);
+        const summonerName = await getSummonerName(payload.data[0].fromSummonerId);
+        const gameMode = payload.data[0].gameConfig.gameMode && 'a game';
         console.log("result: ", summonerName + ' - ' + gameMode);
 
         console.log("Invitation received. Sending message...");
@@ -74,7 +75,7 @@ async function connectToLeague() {
         
 }
 
-async function getInviteInfo(summonerId) {
+async function getSummonerName(summonerId) {
     return new Promise((resolve) => {
         const req = https.request(
             {
@@ -93,9 +94,8 @@ async function getInviteInfo(summonerId) {
                     const name = summoner.gameName
                         ? `${summoner.gameName}`
                         : `Summoner #${summonerId}`;
-                    const gameMode = summoner.gameCongig.gameMode;
                     console.log("summoner name: ", name);
-                    resolve(name, gameMode);
+                    resolve(name);
                 });
             }
         );
