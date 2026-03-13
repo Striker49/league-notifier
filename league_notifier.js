@@ -20,7 +20,7 @@ async function waitUntilLCUReady(port, auth) {
                     if (res.statusCode === 200)
                         resolve();
                     else {
-                        console.log(`LCU not ready yet (status ${res.statusCode})`);
+                        //console.log(`LCU not ready yet (status ${res.statusCode})`);
                         setTimeout(check, 500);
                     }
                 });
@@ -133,8 +133,8 @@ async function connectToLeague(port, auth) {
             // const summonerName = 'Karina';
             // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
             //console.log("result: ", summonerName + ' - ' + gameMode);
-
-            console.log(`Invitation received from ${summonerName} for ${gameMode}. Sending message...`);
+            const date = new Date().toLocaleString();
+            console.log(`\x1b[34m[${date}] Invitation received from ${summonerName} for ${gameMode}. Sending message...\x1b[0m`);
             await sendNotification(summonerName, gameMode);
         });
     });
