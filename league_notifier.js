@@ -1,6 +1,8 @@
-import WebSocket from "ws";
-import fs from "fs";
-import https from "https";
+const WebSocket = require("ws");
+const fs = require("fs");
+const https = require("https");
+process.removeAllListeners('warning');
+process.on('warning', () => {});
 
 async function waitUntilLCUReady(port, auth) {
     return new Promise((resolve) => {
@@ -17,8 +19,10 @@ async function waitUntilLCUReady(port, auth) {
                 (res) => {
                     if (res.statusCode === 200)
                         resolve();
-                    else
+                    else {
+                        console.log(`LCU not ready yet (status ${res.statusCode})`);
                         setTimeout(check, 500);
+                    }
                 });
                 req.on("error", () => setTimeout(check, 500));
                 req.end();
@@ -55,7 +59,7 @@ async function getLockfileCredentials() {
 }
 
 async function sendNotification(summonerName, gameMode) {
-    console.log("summoner name in notification: ", summonerName);
+    //console.log("summoner name in notification: ", summonerName);
     fetch('https://ntfy.sh/lol-invitation', {
         method: 'POST',
         headers: {
@@ -68,15 +72,13 @@ async function sendNotification(summonerName, gameMode) {
 }
 
 async function connectToLeague(port, auth) {
-    console.clear();
     console.log('\x1b[35m╔════════════════════════════════════╗');
     console.log('║   League Invite Notifier  🎮        ║');
     console.log('╚════════════════════════════════════╝\x1b[0m\n');
+    console.log(`\x1b[90mConnecting to League of Legends client on port \x1b[1m${port}\x1b[0m\ ...`);
     console.log(`\x1b[90m  ntfy topic  :\x1b[0m lol-invitation`);
     console.log(`\x1b[90m  port        :\x1b[0m ${port}`);
     console.log(`\x1b[90m  status      :\x1b[0m Connecting...\n`);
-
-    console.log(`\x1b[90mConnecting to League of Legends client on port \x1b[1m${port}\x1b[0m\ ...`);
 
     return new Promise((resolve) => {
         const ws = new WebSocket(`wss://127.0.0.1:${port}`, {
@@ -127,7 +129,7 @@ async function connectToLeague(port, auth) {
                 return;
 
             const summonerName = await getSummonerName(payload.data[0].fromSummonerId, port, auth);
-            const gameMode = payload.data[0].gameConfig?.gameMode && 'a game';
+            const gameMode = payload.data[0]?.gameConfig?.gameMode && 'a game';
             // const summonerName = 'Karina';
             // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
             //console.log("result: ", summonerName + ' - ' + gameMode);
@@ -172,6 +174,7 @@ async function getSummonerName(summonerId, port, auth) {
 }
 
 async function start() {
+    console.clear();
 
     while (true) {
         try {
@@ -179,10 +182,14 @@ async function start() {
             const { port, auth } = await getLockfileCredentials();
             
             await waitUntilLCUReady(port, auth);
+//            await new Promise(r => setTimeout(r, 1000));
+
 
             await connectToLeague(port, auth);
+            
         } catch {
-            console.log("Disconnect from League, waiting for restart...");
+            console.log("Disconnected from League, waiting for restart...");
+            await new Promise((resolve) => setTimeout(resolve, 2000));
         }
     }
 }
