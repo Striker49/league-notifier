@@ -1,5 +1,16 @@
 {
+  "name": "league-notifier",
+  "version": "1.0.0",
+  "bin": "league_notifier.js",
   "dependencies": {
+    "resedit": "^3.0.2",
     "ws": "^8.19.0"
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": ".",
+    "icon": "favicon.ico"
   }
 }
