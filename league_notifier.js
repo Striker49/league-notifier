@@ -13,10 +13,11 @@ function getLockfileCredentials() {
     auth = Buffer.from(`riot:${rawPassword}`).toString("base64");
 }
 
-async function sendNotification(summonerName) {
+async function sendNotification(summonerName, gameMode) {
+    console.log("summoner name in notification: ", summonerName);
     fetch('https://ntfy.sh/lol-invitation', {
         method: 'POST',
-        body: `Invitation received from ${summonerName}! 🎮`
+        body: `Invitation received from ${summonerName} for ${gameMode}! 🎮`
     })
 }
 
@@ -64,16 +65,16 @@ async function connectToLeague() {
         
         console.log("invitation payload: ", payload?.data);
 
-        const summonerName = await getSummonerName(payload.fromSummonerId);
-        console.log("result: ", summonerName);
+        const [summonerName, gameMode] = await getInviteInfo(payload.data[0].fromSummonerId);
+        console.log("result: ", summonerName + ' - ' + gameMode);
 
         console.log("Invitation received. Sending message...");
-        sendNotification(summonerName);
+        await sendNotification(summonerName, gameMode);
     });
         
 }
 
-async function getSummonerName(summonerId) {
+async function getInviteInfo(summonerId) {
     return new Promise((resolve) => {
         const req = https.request(
             {
@@ -92,7 +93,9 @@ async function getSummonerName(summonerId) {
                     const name = summoner.gameName
                         ? `${summoner.gameName}`
                         : `Summoner #${summonerId}`;
-                    resolve(name);
+                    const gameMode = summoner.gameCongig.gameMode;
+                    console.log("summoner name: ", name);
+                    resolve(name, gameMode);
                 });
             }
         );
