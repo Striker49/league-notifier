@@ -2,15 +2,56 @@ import WebSocket from "ws";
 import fs from "fs";
 import https from "https";
 
-let port;
-let auth;
+async function waitUntilLCUReady(port, auth) {
+    return new Promise((resolve) => {
+        const check = () => {
+            const req = https.request({
+                hostname: "127.0.0.1",
+                port,
+                path: "/lol-summoner/v1/current-summoner",
+                method: "GET",
+                headers: {
+                    Authorization: `Basic ${auth}`},
+                    rejectUnauthorized: false,
+                },
+                (res) => {
+                    if (res.statusCode === 200)
+                        resolve();
+                    else
+                        setTimeout(check, 500);
+                });
+                req.on("error", () => setTimeout(check, 500));
+                req.end();
+            };
+            check();
+        });
+}
 
-function getLockfileCredentials() {
+async function getLockfileCredentials() {
     const LockfilePath = "C:/Riot Games/League of Legends/lockfile";
+    const directory = "C:/Riot Games/League of Legends";
+
+    if (!fs.existsSync(LockfilePath)) {
+        console.log('No lockfile found, waiting for League to launch...');
+
+        await new Promise((resolve) => {
+            const watcher = fs.watch(directory, (eventType, filename) => {
+                if (filename == "lockfile") {
+                    console.log("Lockfile detected!");
+                    watcher.close();
+                    resolve();
+                }
+            })
+        })
+    }
     const content = fs.readFileSync(LockfilePath, "utf-8").trim();
     const [,,rawPort, rawPassword] = content.split(":");
-    port = rawPort;
-    auth = Buffer.from(`riot:${rawPassword}`).toString("base64");
+    const port = rawPort;
+    const auth = Buffer.from(`riot:${rawPassword}`).toString("base64");
+    // console.log('port:', port);
+    // console.log('auth:', auth);
+
+    return { port, auth };
 }
 
 async function sendNotification(summonerName, gameMode) {
@@ -26,7 +67,7 @@ async function sendNotification(summonerName, gameMode) {
     })
 }
 
-async function connectToLeague() {
+async function connectToLeague(port, auth) {
     console.clear();
     console.log('\x1b[35m╔════════════════════════════════════╗');
     console.log('║   League Invite Notifier  🎮        ║');
@@ -37,61 +78,68 @@ async function connectToLeague() {
 
     console.log(`\x1b[90mConnecting to League of Legends client on port \x1b[1m${port}\x1b[0m\ ...`);
 
-    const ws = new WebSocket(`wss://127.0.0.1:${port}`, {
-        headers: { Authorization: `Basic ${auth}` },
-        rejectUnauthorized: false
-    });
+    return new Promise((resolve) => {
+        const ws = new WebSocket(`wss://127.0.0.1:${port}`, {
+            headers: { Authorization: `Basic ${auth}` },
+            rejectUnauthorized: false
+        });
 
-    ws.on("open", () => {
-        console.log("\x1b[32mConnected!\x1b[0m\nListening for party invites...\n");
-        ws.send(JSON.stringify([5, "OnJsonApiEvent"]));
-    });
+        ws.on("open", () => {
+            console.log("\x1b[32mConnected!\x1b[0m\nListening for party invites...\n");
+            ws.send(JSON.stringify([5, "OnJsonApiEvent"]));
+        });
 
-    ws.on("error", (e) => {
-        console.log("Connection error: ", e.message);
-    });
+        ws.on("error", (e) => {
+            console.log("Connection error: ", e.message);
+        });
 
-    ws.on("message", async (raw) => {
-        let msg;
+        ws.on("close", () => {
+            console.log("League client closed.");
+            resolve();
+        })
 
-        try {
+        ws.on("message", async (raw) => {
+            let msg;
 
-        msg = JSON.parse(raw.toString());
-        //console.log("Event received: ", msg[0]);
+            try {
 
-        } catch (e) {
-            return;
-        }
+            msg = JSON.parse(raw.toString());
+            //console.log("Event received: ", msg[0]);
+
+            } catch (e) {
+                return;
+            }
+                
+            if (!Array.isArray(msg))
+                return;
             
-        if (!Array.isArray(msg))
+            const [,, payload] = msg;
+
+            //console.log("Event name: ", eventName);
+            //console.log("URI", JSON.stringify(payload?.uri));
+            
+            if (payload?.uri !== "/lol-lobby/v2/received-invitations") 
             return;
-        
-        const [,, payload] = msg;
+            
+            //console.log("invitation payload: ", payload);
 
-        //console.log("Event name: ", eventName);
-        //console.log("URI", JSON.stringify(payload?.uri));
-        
-        if (payload?.uri !== "/lol-lobby/v2/received-invitations") 
-           return;
-        
-        //console.log("invitation payload: ", payload);
+            if (!Array.isArray(payload.data) || payload.data.length === 0)
+                return;
 
-        if (!Array.isArray(payload.data) || payload.data.length === 0)
-            return;
+            const summonerName = await getSummonerName(payload.data[0].fromSummonerId, port, auth);
+            const gameMode = payload.data[0].gameConfig?.gameMode && 'a game';
+            // const summonerName = 'Karina';
+            // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
+            //console.log("result: ", summonerName + ' - ' + gameMode);
 
-        const summonerName = await getSummonerName(payload.data[0].fromSummonerId);
-        const gameMode = payload.data[0].gameConfig?.gameMode && 'a game';
-        // const summonerName = 'Karina';
-        // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
-        console.log("result: ", summonerName + ' - ' + gameMode);
-
-        console.log("Invitation received. Sending message...");
-        await sendNotification(summonerName, gameMode);
+            console.log(`Invitation received from ${summonerName} for ${gameMode}. Sending message...`);
+            await sendNotification(summonerName, gameMode);
+        });
     });
         
 }
 
-async function getSummonerName(summonerId) {
+async function getSummonerName(summonerId, port, auth) {
     return new Promise((resolve) => {
         const req = https.request(
             {
@@ -110,7 +158,7 @@ async function getSummonerName(summonerId) {
                     const name = summoner.gameName
                         ? `${summoner.gameName}`
                         : `Summoner #${summonerId}`;
-                    console.log("summoner name: ", name);
+                    //console.log("summoner name: ", name);
                     resolve(name);
                 });
             }
@@ -123,6 +171,21 @@ async function getSummonerName(summonerId) {
     });
 }
 
-getLockfileCredentials();
+async function start() {
 
-connectToLeague();
+    while (true) {
+        try {
+            
+            const { port, auth } = await getLockfileCredentials();
+            
+            await waitUntilLCUReady(port, auth);
+
+            await connectToLeague(port, auth);
+        } catch {
+            console.log("Disconnect from League, waiting for restart...");
+        }
+    }
+}
+
+
+start();
