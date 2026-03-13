@@ -17,12 +17,23 @@ async function sendNotification(summonerName, gameMode) {
     console.log("summoner name in notification: ", summonerName);
     fetch('https://ntfy.sh/lol-invitation', {
         method: 'POST',
+        headers: {
+            title: 'League of Legends',
+            priority: 5,
+            tags: 'video_games',
+        },
         body: `Invitation received from ${summonerName} for ${gameMode}! 🎮`
     })
 }
 
 async function connectToLeague() {
     console.clear();
+    console.log('\x1b[35m╔════════════════════════════════════╗');
+    console.log('║   League Invite Notifier  🎮        ║');
+    console.log('╚════════════════════════════════════╝\x1b[0m\n');
+    console.log(`\x1b[90m  ntfy topic  :\x1b[0m lol-invitation`);
+    console.log(`\x1b[90m  port        :\x1b[0m ${port}`);
+    console.log(`\x1b[90m  status      :\x1b[0m Connecting...\n`);
 
     console.log(`\x1b[90mConnecting to League of Legends client on port \x1b[1m${port}\x1b[0m\ ...`);
 
@@ -63,10 +74,15 @@ async function connectToLeague() {
         if (payload?.uri !== "/lol-lobby/v2/received-invitations") 
            return;
         
-        console.log("invitation payload: ", payload?.data);
+        //console.log("invitation payload: ", payload);
+
+        if (!Array.isArray(payload.data) || payload.data.length === 0)
+            return;
 
         const summonerName = await getSummonerName(payload.data[0].fromSummonerId);
-        const gameMode = payload.data[0].gameConfig.gameMode && 'a game';
+        const gameMode = payload.data[0].gameConfig?.gameMode && 'a game';
+        // const summonerName = 'Karina';
+        // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
         console.log("result: ", summonerName + ' - ' + gameMode);
 
         console.log("Invitation received. Sending message...");

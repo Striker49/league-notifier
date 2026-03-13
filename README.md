@@ -5,7 +5,7 @@ Monitor League of Legends game invites and push instant notifications to your ph
 
 Install the ntfy app on your phone https://ntfy.sh/
 
-Subscribe to a topic called "lol-invitation"
+Subscribe to a topic with a name of your choice and put the same one int the sendNotification fetch link https://ntfy.sh/yourTopic
 
 Run npm install
 
