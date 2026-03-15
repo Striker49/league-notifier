@@ -67,7 +67,7 @@ async function sendNotification(summonerName, gameMode) {
             priority: 5,
             tags: 'video_games',
         },
-        body: `Invitation received from ${summonerName} for ${gameMode}! 🎮`
+        body: `Invitation from ${summonerName} to play ${gameMode}! 🎮`
     })
 }
 
@@ -129,7 +129,7 @@ async function connectToLeague(port, auth) {
                 return;
 
             const summonerName = await getSummonerName(payload.data[0].fromSummonerId, port, auth);
-            const gameMode = payload.data[0]?.gameConfig?.gameMode && 'a game';
+            const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
             // const summonerName = 'Karina';
             // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
             //console.log("result: ", summonerName + ' - ' + gameMode);
