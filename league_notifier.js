@@ -20,7 +20,6 @@ async function waitUntilLCUReady(port, auth) {
                     if (res.statusCode === 200)
                         resolve();
                     else {
-                        //console.log(`LCU not ready yet (status ${res.statusCode})`);
                         setTimeout(check, 500);
                     }
                 });
@@ -52,14 +51,10 @@ async function getLockfileCredentials() {
     const [,,rawPort, rawPassword] = content.split(":");
     const port = rawPort;
     const auth = Buffer.from(`riot:${rawPassword}`).toString("base64");
-    // console.log('port:', port);
-    // console.log('auth:', auth);
-
     return { port, auth };
 }
 
 async function sendNotification(summonerName, gameMode) {
-    //console.log("summoner name in notification: ", summonerName);
     fetch('https://ntfy.sh/lol-invitation', {
         method: 'POST',
         headers: {
@@ -72,9 +67,7 @@ async function sendNotification(summonerName, gameMode) {
 }
 
 async function connectToLeague(port, auth) {
-    console.log('\x1b[35m╔════════════════════════════════════╗');
-    console.log('║   League Invite Notifier  🎮        ║');
-    console.log('╚════════════════════════════════════╝\x1b[0m\n');
+
     console.log(`\x1b[90mConnecting to League of Legends client on port \x1b[1m${port}\x1b[0m\ ...`);
     console.log(`\x1b[90m  ntfy topic  :\x1b[0m lol-invitation`);
     console.log(`\x1b[90m  port        :\x1b[0m ${port}`);
@@ -106,7 +99,6 @@ async function connectToLeague(port, auth) {
             try {
 
             msg = JSON.parse(raw.toString());
-            //console.log("Event received: ", msg[0]);
 
             } catch (e) {
                 return;
@@ -117,22 +109,16 @@ async function connectToLeague(port, auth) {
             
             const [,, payload] = msg;
 
-            //console.log("Event name: ", eventName);
-            //console.log("URI", JSON.stringify(payload?.uri));
-            
+            //Filter lobby invitations
             if (payload?.uri !== "/lol-lobby/v2/received-invitations") 
-            return;
-            
-            //console.log("invitation payload: ", payload);
+                return;
 
             if (!Array.isArray(payload.data) || payload.data.length === 0)
                 return;
 
             const summonerName = await getSummonerName(payload.data[0].fromSummonerId, port, auth);
             const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
-            // const summonerName = 'Karina';
-            // const gameMode = payload.data[0]?.gameConfig?.gameMode ?? 'a game';
-            //console.log("result: ", summonerName + ' - ' + gameMode);
+
             const date = new Date().toLocaleString();
             console.log(`\x1b[34m[${date}] Invitation received from ${summonerName} for ${gameMode}. Sending message...\x1b[0m`);
             await sendNotification(summonerName, gameMode);
@@ -160,7 +146,6 @@ async function getSummonerName(summonerId, port, auth) {
                     const name = summoner.gameName
                         ? `${summoner.gameName}`
                         : `Summoner #${summonerId}`;
-                    //console.log("summoner name: ", name);
                     resolve(name);
                 });
             }
@@ -175,15 +160,17 @@ async function getSummonerName(summonerId, port, auth) {
 
 async function start() {
     console.clear();
+    console.log('\x1b[35m╔════════════════════════════════════╗');
+    console.log('║   League Invite Notifier  🎮        ║');
+    console.log('╚════════════════════════════════════╝\x1b[0m\n');
 
     while (true) {
         try {
             
             const { port, auth } = await getLockfileCredentials();
-            
-            await waitUntilLCUReady(port, auth);
-//            await new Promise(r => setTimeout(r, 1000));
 
+            //Wait until League Client is done opening after lockfile creation
+            await waitUntilLCUReady(port, auth);
 
             await connectToLeague(port, auth);
             
